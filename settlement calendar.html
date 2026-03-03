@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>決算カレンダー | Earnings Calendar</title>
+  <style>
+    :root {
+      --bg:        #080812;
+      --bg2:       #0f0f1e;
+      --bg3:       #16162a;
+      --bg4:       #1e1e36;
+      --border:    #2a2a4a;
+      --border2:   #3a3a5c;
+      --cyan:      #00d4ff;
+      --purple:    #9b5cf6;
+      --green:     #10b981;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --txt:       #f1f5f9;
+      --txt2:      #94a3b8;
+      --txt3:      #475569;
+      --grad:      linear-gradient(135deg,#00d4ff,#9b5cf6);
+      --glow-c:    0 0 24px rgba(0,212,255,.25);
+      --glow-p:    0 0 24px rgba(155,92,246,.25);
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:var(--bg);color:var(--txt);
+      min-height:100vh;overflow-x:hidden;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:var(--bg2)}
+    ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+    /* ── HEADER ── */
+    header{
+      position:sticky;top:0;z-index:200;
+      background:rgba(8,8,18,.85);
+      border-bottom:1px solid var(--border);
+      backdrop-filter:blur(12px);
+      padding:0 24px;height:64px;
+      display:flex;align-items:center;justify-content:space-between;
+    }
+    .logo{display:flex;align-items:center;gap:12px}
+    .logo-icon{
+      width:38px;height:38px;border-radius:10px;
+      background:var(--grad);
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;box-shadow:var(--glow-c);
+    }
+    .logo-txt{
+      font-size:18px;font-weight:700;letter-spacing:-.3px;
+      background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .header-right{display:flex;align-items:center;gap:10px}
+    .notif-badge{
+      padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;
+      display:flex;align-items:center;gap:6px;cursor:pointer;transition:all .2s;
+    }
+    .notif-badge.granted{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+    .notif-badge.denied {background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+    .notif-badge.default{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
+    .btn{
+      padding:8px 16px;border-radius:8px;border:none;cursor:pointer;
+      font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;
+      transition:all .2s;
+    }
+    .btn-primary{background:var(--grad);color:#fff;box-shadow:var(--glow-c)}
+    .btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+    .btn-ghost{background:transparent;color:var(--txt2);border:1px solid var(--border)}
+    .btn-ghost:hover{background:var(--bg4);color:var(--txt);border-color:var(--border2)}
+    .btn-sm{padding:5px 10px;font-size:12px}
+
+    /* ── LAYOUT ── */
+    .layout{display:grid;grid-template-columns:280px 1fr;min-height:calc(100vh - 64px)}
+
+    /* ── SIDEBAR ── */
+    .sidebar{
+      background:var(--bg2);border-right:1px solid var(--border);
+      padding:20px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;
+    }
+    .section-label{
+      font-size:10px;font-weight:700;text-transform:uppercase;
+      letter-spacing:1.2px;color:var(--txt3);margin-bottom:10px;
+    }
+    .add-row{display:flex;gap:8px}
+    .ticker-input{
+      flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;
+      padding:8px 12px;color:var(--txt);font-size:13px;font-weight:600;
+      text-transform:uppercase;outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    .ticker-input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1)}
+    .ticker-input::placeholder{color:var(--txt3);text-transform:none;font-weight:400}
+
+    /* watchlist */
+    .watchlist{display:flex;flex-direction:column;gap:6px}
+    .ticker-card{
+      background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+      padding:10px 12px;display:flex;align-items:center;gap:10px;
+      cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+    }
+    .ticker-card::before{
+      content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+      background:var(--grad);opacity:0;transition:opacity .2s;
+    }
+    .ticker-card:hover{border-color:var(--border2);background:var(--bg4)}
+    .ticker-card:hover::before{opacity:1}
+    .ticker-card.has-next::before{opacity:1}
+    .tc-info{flex:1;min-width:0}
+    .tc-symbol{font-size:14px;font-weight:700}
+    .tc-date{font-size:11px;color:var(--txt2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .tc-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+    .badge{
+      padding:2px 7px;border-radius:4px;font-size:10px;font-weight:700;
+      white-space:nowrap;
+    }
+    .badge-red   {background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+    .badge-cyan  {background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.2)}
+    .badge-grey  {background:rgba(148,163,184,.08);color:var(--txt3)}
+    .del-btn{
+      width:22px;height:22px;border-radius:5px;border:none;cursor:pointer;
+      background:transparent;color:var(--txt3);font-size:14px;line-height:1;
+      display:flex;align-items:center;justify-content:center;transition:all .15s;
+    }
+    .del-btn:hover{background:rgba(239,68,68,.15);color:var(--red)}
+
+    /* legend */
+    .legend{display:flex;flex-direction:column;gap:7px}
+    .legend-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2)}
+    .leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+    /* sidebar bottom */
+    .refresh-row{display:flex;justify-content:space-between;align-items:center}
+    .icon-btn{
+      width:30px;height:30px;border-radius:7px;border:1px solid var(--border);
+      background:transparent;color:var(--txt3);cursor:pointer;
+      display:flex;align-items:center;justify-content:center;transition:all .2s;
+    }
+    .icon-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.08)}
+    .icon-btn.spinning svg{animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* ── MAIN ── */
+    .main{padding:24px;overflow-y:auto;display:flex;flex-direction:column;gap:20px}
+
+    /* stats */
+    .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .stat{
+      background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;
+      position:relative;overflow:hidden;
+    }
+    .stat::after{
+      content:'';position:absolute;top:-40px;right:-40px;
+      width:80px;height:80px;border-radius:50%;
+      background:var(--stat-color,var(--cyan));opacity:.06;
+    }
+    .stat-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--txt3);margin-bottom:6px}
+    .stat-val{font-size:28px;font-weight:800;color:var(--stat-color,var(--cyan))}
+
+    /* calendar header */
+    .cal-header{display:flex;align-items:center;justify-content:space-between}
+    .cal-nav{display:flex;align-items:center;gap:14px}
+    .cal-title{font-size:22px;font-weight:800;min-width:180px;text-align:center}
+    .nav-btn{
+      width:34px;height:34px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);
+      color:var(--txt2);cursor:pointer;display:flex;align-items:center;justify-content:center;
+      font-size:14px;transition:all .2s;
+    }
+    .nav-btn:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.06)}
+
+    /* calendar grid */
+    .cal-grid{
+      background:var(--bg2);border:1px solid var(--border);
+      border-radius:16px;overflow:hidden;
+    }
+    .cal-weekdays{
+      display:grid;grid-template-columns:repeat(7,1fr);
+      background:var(--bg3);border-bottom:1px solid var(--border);
+    }
+    .wday{
+      padding:10px;text-align:center;font-size:11px;font-weight:700;
+      color:var(--txt3);text-transform:uppercase;letter-spacing:.5px;
+    }
+    .cal-days{display:grid;grid-template-columns:repeat(7,1fr)}
+    .cal-day{
+      min-height:96px;padding:8px;
+      border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+      position:relative;transition:background .15s;
+    }
+    .cal-day:nth-child(7n){border-right:none}
+    .cal-day.other-month{opacity:.25}
+    .cal-day.today{background:rgba(0,212,255,.04)}
+    .cal-day:not(.other-month):hover{background:var(--bg4);cursor:pointer}
+    .cal-day.weekend .day-num{color:var(--txt3)}
+    .day-num{
+      font-size:13px;font-weight:500;color:var(--txt2);
+      width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+      border-radius:50%;margin-bottom:4px;
+    }
+    .cal-day.today .day-num{
+      background:var(--cyan);color:#000;font-weight:800;
+      box-shadow:0 0 12px rgba(0,212,255,.5);
+    }
+    .e-tag{
+      display:flex;align-items:center;gap:3px;
+      padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;
+      margin:2px 0;cursor:pointer;transition:opacity .15s;width:100%;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    }
+    .e-tag:hover{opacity:.75}
+    .e-tag.bmo{background:rgba(16,185,129,.15);color:#10b981;border:1px solid rgba(16,185,129,.25)}
+    .e-tag.amc{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.25)}
+    .e-tag.def{background:rgba(155,92,246,.15);color:#9b5cf6;border:1px solid rgba(155,92,246,.25)}
+    .e-more{font-size:10px;color:var(--txt3);margin-top:2px;padding-left:2px}
+
+    /* ── TOAST ── */
+    .toast-wrap{
+      position:fixed;top:72px;right:20px;z-index:999;
+      display:flex;flex-direction:column;gap:8px;pointer-events:none;
+    }
+    .toast{
+      background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+      padding:11px 16px;font-size:13px;max-width:300px;
+      box-shadow:0 8px 30px rgba(0,0,0,.4);
+      animation:fadeInRight .25s ease;pointer-events:auto;
+      display:flex;align-items:center;gap:8px;
+    }
+    .toast.success{border-left:3px solid var(--green)}
+    .toast.error  {border-left:3px solid var(--red)}
+    .toast.info   {border-left:3px solid var(--cyan)}
+    @keyframes fadeInRight{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+
+    /* ── SPINNER ── */
+    .spin-sm{
+      display:inline-block;width:12px;height:12px;
+      border:2px solid var(--border2);border-top-color:var(--cyan);
+      border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;
+    }
+
+    /* empty */
+    .empty{
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      height:120px;color:var(--txt3);gap:8px;font-size:13px;
+    }
+    .empty-icon{font-size:32px;opacity:.4}
+
+    /* ── MODAL (earnings detail) ── */
+    .modal-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+      z-index:500;display:none;align-items:center;justify-content:center;
+    }
+    .modal-overlay.open{display:flex;animation:fadeIn .2s ease}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .modal{
+      background:var(--bg3);border:1px solid var(--border2);border-radius:16px;
+      padding:24px;min-width:320px;max-width:420px;width:90%;
+      box-shadow:0 24px 60px rgba(0,0,0,.6);animation:slideUp .2s ease;
+    }
+    @keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+    .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+    .modal-title{font-size:18px;font-weight:800}
+    .close-btn{
+      width:28px;height:28px;border-radius:7px;border:1px solid var(--border);
+      background:transparent;color:var(--txt3);cursor:pointer;font-size:16px;
+      display:flex;align-items:center;justify-content:center;transition:all .15s;
+    }
+    .close-btn:hover{background:var(--bg4);color:var(--txt)}
+    .modal-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+    .modal-row:last-child{border-bottom:none}
+    .modal-key{font-size:12px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+    .modal-val{font-size:13px;font-weight:600}
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:700px){
+      .layout{grid-template-columns:1fr}
+      .sidebar{border-right:none;border-bottom:1px solid var(--border)}
+      .stats{grid-template-columns:repeat(3,1fr)}
+      .cal-day{min-height:64px}
+    }
+
+    /* ── DETAIL PANEL ── */
+    .panel-overlay{
+      position:fixed;inset:0;z-index:300;
+      background:transparent;pointer-events:none;
+      transition:background .25s;
+    }
+    .panel-overlay.open{
+      background:rgba(0,0,0,.65);pointer-events:auto;
+      backdrop-filter:blur(4px);
+    }
+    .detail-panel{
+      position:absolute;right:0;top:0;bottom:0;width:460px;max-width:100vw;
+      background:var(--bg2);border-left:1px solid var(--border);
+      display:flex;flex-direction:column;
+      transform:translateX(106%);
+      transition:transform .32s cubic-bezier(.4,0,.2,1);
+      overflow:hidden;
+    }
+    .panel-overlay.open .detail-panel{
+      transform:translateX(0);
+      box-shadow:-28px 0 70px rgba(0,0,0,.55);
+    }
+    .panel-head{
+      padding:18px 20px;border-bottom:1px solid var(--border);
+      display:flex;align-items:flex-start;justify-content:space-between;
+      flex-shrink:0;background:var(--bg3);
+    }
+    .panel-sym{
+      font-size:24px;font-weight:800;
+      background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    }
+    .panel-co{font-size:12px;color:var(--txt2);margin-top:4px}
+    .panel-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:16px}
+
+    /* Price card */
+    .price-card{
+      background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px;
+    }
+    .price-top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .price-num{font-size:40px;font-weight:800;letter-spacing:-.8px;line-height:1}
+    .price-chg{font-size:14px;font-weight:700;display:flex;align-items:center;gap:3px}
+    .price-chg.up{color:var(--green)}
+    .price-chg.dn{color:var(--red)}
+    .price-grid{
+      display:grid;grid-template-columns:1fr 1fr;gap:0;
+      padding-top:12px;border-top:1px solid var(--border);
+    }
+    .pg-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0}
+    .pg-lbl{font-size:11px;color:var(--txt3);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+    .pg-val{font-size:13px;font-weight:700}
+
+    /* Chart card */
+    .chart-card{
+      background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:18px;
+    }
+    .chart-head{font-size:13px;font-weight:700;margin-bottom:12px}
+    .chart-legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .cl-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txt2)}
+    .cl-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+    .bar-rect{transition:opacity .15s;cursor:default}
+    .bar-rect:hover{opacity:1 !important}
+
+    /* Quarterly table */
+    .q-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:14px}
+    .q-table th{
+      padding:5px 6px;font-size:10px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.5px;color:var(--txt3);
+    }
+    .q-table th:first-child{text-align:left}
+    .q-table th:not(:first-child){text-align:right}
+    .q-table td{padding:6px 6px;border-top:1px solid var(--border)}
+    .q-table td:first-child{color:var(--txt3);font-weight:700}
+    .q-table td:not(:first-child){text-align:right;font-weight:600}
+    .q-table tr:hover td{background:var(--bg4)}
+
+    /* Skeleton loader */
+    .skel{
+      background:linear-gradient(90deg,var(--bg4) 25%,var(--border) 50%,var(--bg4) 75%);
+      background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px;
+    }
+    @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+    .no-panel-data{color:var(--txt3);font-size:13px;text-align:center;padding:20px 0}
+
+    /* Calendar jump button on watchlist card */
+    .cal-jump-btn{
+      width:22px;height:22px;border-radius:5px;border:none;cursor:pointer;
+      background:transparent;color:var(--txt3);font-size:13px;
+      display:flex;align-items:center;justify-content:center;transition:all .15s;
+    }
+    .cal-jump-btn:hover{background:rgba(0,212,255,.1);color:var(--cyan)}
+
+    @media(max-width:500px){.detail-panel{width:100vw}}
+
+    /* ── PANEL TABS ── */
+    .panel-tabs{
+      display:flex;border-bottom:1px solid var(--border);
+      background:var(--bg3);flex-shrink:0;overflow-x:auto;scrollbar-width:none;
+    }
+    .panel-tabs::-webkit-scrollbar{display:none}
+    .ptab{
+      padding:10px 14px;border:none;background:transparent;
+      color:var(--txt3);font-size:12px;font-weight:600;cursor:pointer;
+      border-bottom:2px solid transparent;transition:all .15s;
+      white-space:nowrap;flex-shrink:0;
+    }
+    .ptab:hover{color:var(--txt2);background:rgba(255,255,255,.04)}
+    .ptab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+
+    /* ── AUTOCOMPLETE ── */
+    .ac-wrap{position:relative;flex:1;min-width:0}
+    .ac-drop{
+      position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:400;
+      background:var(--bg3);border:1px solid var(--border2);border-radius:10px;
+      box-shadow:0 8px 28px rgba(0,0,0,.5);display:none;overflow:hidden;
+    }
+    .ac-drop.open{display:block;animation:fadeInRight .15s ease}
+    .ac-item{
+      padding:9px 12px;cursor:pointer;display:flex;align-items:center;
+      gap:10px;transition:background .1s;
+    }
+    .ac-item:hover{background:var(--bg4)}
+    .ac-item:not(:last-child){border-bottom:1px solid var(--border)}
+    .ac-sym{font-size:13px;font-weight:800;color:var(--txt);min-width:52px;flex-shrink:0}
+    .ac-name{font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+    /* ── NEWS ── */
+    .news-card{
+      display:block;text-decoration:none;color:inherit;
+      background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+      padding:12px;margin-bottom:8px;cursor:pointer;transition:all .15s;
+    }
+    .news-card:hover{border-color:var(--border2);background:var(--bg4)}
+    .news-card:last-child{margin-bottom:0}
+    .news-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+    .news-src{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--cyan);opacity:.8}
+    .news-date{font-size:10px;color:var(--txt3)}
+    .news-ttl{font-size:12px;font-weight:600;color:var(--txt);line-height:1.5}
+    .news-filter-badge{
+      font-size:11px;font-weight:600;padding:5px 10px;border-radius:6px;margin-bottom:10px;
+      background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.2);
+    }
+    .news-filter-en{
+      background:rgba(148,163,184,.08);color:var(--txt3);border-color:var(--border);
+    }
+    .news-sum{font-size:11px;color:var(--txt3);margin-top:4px;line-height:1.4;
+              display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+    /* ── ANALYST RECS ── */
+    .rec-bars{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+    .rec-row{display:flex;align-items:center;gap:8px}
+    .rec-lbl{font-size:11px;color:var(--txt3);width:82px;flex-shrink:0;font-weight:600}
+    .rec-bwrap{flex:1;height:7px;background:var(--bg4);border-radius:4px;overflow:hidden}
+    .rec-bar{height:100%;border-radius:4px;transition:width .5s ease}
+    .rec-cnt{font-size:11px;font-weight:700;color:var(--txt2);min-width:22px;text-align:right}
+
+    /* ── GRADE CHANGES ── */
+    .grade-row{
+      display:flex;align-items:flex-start;justify-content:space-between;
+      padding:9px 0;border-bottom:1px solid var(--border);gap:8px;
+    }
+    .grade-row:last-child{border-bottom:none}
+    .grade-firm{font-size:12px;font-weight:600;color:var(--txt)}
+    .grade-chg{font-size:11px;color:var(--txt3);margin-top:2px}
+    .grade-dt {font-size:10px;color:var(--txt3);margin-top:1px}
+    .gbadge{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0}
+    .gbadge-up {background:rgba(16,185,129,.15);color:var(--green)}
+    .gbadge-dn {background:rgba(239,68,68,.15);color:var(--red)}
+    .gbadge-neu{background:rgba(148,163,184,.1);color:var(--txt3)}
+
+    /* ── PEERS ── */
+    .peers-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+    .peer-chip{
+      padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;
+      background:var(--bg4);border:1px solid var(--border);cursor:pointer;
+      display:flex;align-items:center;gap:5px;transition:all .15s;
+    }
+    .peer-chip:hover:not(.peer-in){border-color:var(--cyan);color:var(--cyan)}
+    .peer-chip.peer-in{border-color:rgba(16,185,129,.3);color:var(--green);cursor:default}
+
+    /* ── BULK MODAL ── */
+    .bulk-ta{
+      width:100%;height:110px;background:var(--bg3);border:1px solid var(--border);
+      border-radius:8px;padding:10px 12px;color:var(--txt);font-size:13px;
+      resize:none;outline:none;font-family:monospace;line-height:1.6;
+    }
+    .bulk-ta:focus{border-color:var(--cyan)}
+    .modal-desc{font-size:13px;color:var(--txt2);margin-bottom:10px;line-height:1.6}
+    .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+  </style>
+</head>
+<body>
+
+<!-- TOASTS -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modalTitle"></div>
+      <button class="close-btn" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <span class="logo-txt">決算カレンダー</span>
+  </div>
+  <div class="header-right">
+    <div class="notif-badge default" id="notifBadge" onclick="enableNotif()">
+      <span id="notifIcon">🔔</span>
+      <span id="notifText">通知: 未設定</span>
+    </div>
+  </div>
+</header>
+
+<!-- APP LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Add ticker -->
+    <div>
+      <div class="section-label">ティッカーを追加</div>
+      <div class="add-row">
+        <div class="ac-wrap">
+          <input type="text" id="tickerInput" class="ticker-input"
+            placeholder="AAPL, NVDA…" maxlength="15" style="width:100%" />
+          <div class="ac-drop" id="acDrop"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addTicker()">追加</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="openBulkModal()"
+        style="width:100%;margin-top:8px;justify-content:center">
+        ＋ 一括インポート
+      </button>
+    </div>
+
+    <!-- Watchlist -->
+    <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+      <div class="refresh-row" style="margin-bottom:10px">
+        <div class="section-label" style="margin:0">ウォッチリスト</div>
+        <button class="icon-btn" id="refreshBtn" onclick="refreshAll()" title="全データ再取得">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+          </svg>
+        </button>
+      </div>
+      <div class="watchlist" id="watchlist" style="overflow-y:auto;flex:1"></div>
+    </div>
+
+    <!-- Legend -->
+    <div>
+      <div class="section-label">発表タイミング</div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="leg-dot" style="background:rgba(16,185,129,.6)"></div>
+          <span>寄り前 (BMO)</span>
+        </div>
+        <div class="legend-item">
+          <div class="leg-dot" style="background:rgba(245,158,11,.6)"></div>
+          <span>引け後 (AMC)</span>
+        </div>
+        <div class="legend-item">
+          <div class="leg-dot" style="background:rgba(155,92,246,.6)"></div>
+          <span>時間未定</span>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- Stats -->
+    <div class="stats" id="stats"></div>
+
+    <!-- Calendar header -->
+    <div class="cal-header">
+      <div class="cal-nav">
+        <button class="nav-btn" onclick="changeMonth(-1)">&#9664;</button>
+        <div class="cal-title" id="calTitle"></div>
+        <button class="nav-btn" onclick="changeMonth(1)">&#9654;</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="goToday()">今月</button>
+    </div>
+
+    <!-- Calendar -->
+    <div class="cal-grid">
+      <div class="cal-weekdays">
+        <div class="wday" style="color:#ef4444">日</div>
+        <div class="wday">月</div><div class="wday">火</div>
+        <div class="wday">水</div><div class="wday">木</div>
+        <div class="wday">金</div>
+        <div class="wday" style="color:#60a5fa">土</div>
+      </div>
+      <div class="cal-days" id="calDays"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="panel-overlay" id="panelOverlay" onclick="panelBgClick(event)">
+  <div class="detail-panel" id="detailPanel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-sym" id="panelSym"></div>
+        <div class="panel-co"  id="panelCo"></div>
+      </div>
+      <button class="close-btn" onclick="closePanel()">✕</button>
+    </div>
+    <div class="panel-tabs">
+      <button class="ptab active" data-tab="overview" onclick="switchTab('overview')">📊 概要</button>
+      <button class="ptab" data-tab="news"     onclick="switchTab('news')">📰 ニュース</button>
+      <button class="ptab" data-tab="analyst"  onclick="switchTab('analyst')">👥 アナリスト</button>
+      <button class="ptab" data-tab="peers"    onclick="switchTab('peers')">🔗 関連銘柄</button>
+    </div>
+    <div class="panel-body" id="panelBody"></div>
+  </div>
+</div>
+
+<!-- BULK IMPORT MODAL -->
+<div class="modal-overlay" id="bulkModal" onclick="closeBulkModal(event)">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-head">
+      <div class="modal-title">一括インポート</div>
+      <button class="close-btn" onclick="closeBulkModal()">✕</button>
+    </div>
+    <p class="modal-desc">カンマ・スペース・改行区切りでティッカーを入力してください</p>
+    <textarea id="bulkInput" class="bulk-ta"
+      placeholder="AAPL, NVDA, MSFT&#10;GOOGL META AMZN"></textarea>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeBulkModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="doBulkImport()">追加する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ═══════════════════════════════════════════════
+     CONFIG & STATE
+  ═══════════════════════════════════════════════ */
+  const API_KEY   = 'd6ii01pr01qm7dc7j4j0d6ii01pr01qm7dc7j4jg';
+  const BASE_URL  = 'https://finnhub.io/api/v1';
+  const CACHE_TTL = 8 * 60 * 60 * 1000; // 8 h
+
+  let watchlist  = JSON.parse(localStorage.getItem('ec_watchlist')  || '[]');
+  let cache      = JSON.parse(localStorage.getItem('ec_cache')      || '{}');
+  let notifSent  = JSON.parse(localStorage.getItem('ec_notifSent')  || '{}');
+  let loadingSet = new Set();
+
+  let calYear  = new Date().getFullYear();
+  let calMonth = new Date().getMonth();
+
+  const MONTHS_JP = ['1月','2月','3月','4月','5月','6月',
+                     '7月','8月','9月','10月','11月','12月'];
+  const DEFAULT_TICKERS = ['AAPL','NVDA','MSFT','GOOGL','META','AMZN'];
+
+  /* ═══════════════════════════════════════════════
+     STORAGE HELPERS
+  ═══════════════════════════════════════════════ */
+  function saveWatchlist(){ localStorage.setItem('ec_watchlist', JSON.stringify(watchlist)) }
+  function saveCache()    { localStorage.setItem('ec_cache',     JSON.stringify(cache))     }
+  function saveNotifSent(){ localStorage.setItem('ec_notifSent', JSON.stringify(notifSent)) }
+
+  /* ═══════════════════════════════════════════════
+     DATE HELPERS
+  ═══════════════════════════════════════════════ */
+  function fmtDate(d){
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  function daysUntil(dateStr){
+    const t = new Date(); t.setHours(0,0,0,0);
+    const e = new Date(dateStr); e.setHours(0,0,0,0);
+    return Math.round((e - t) / 86400000);
+  }
+  function fmtJP(dateStr){
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     API
+  ═══════════════════════════════════════════════ */
+  async function fetchEarnings(symbol, force=false){
+    const hit = cache[symbol];
+    if(!force && hit && (Date.now() - hit.ts) < CACHE_TTL) return hit.data;
+
+    try{
+      const from = fmtDate(new Date(Date.now() - 90*86400000));
+      const to   = fmtDate(new Date(Date.now() + 180*86400000));
+      const res  = await fetch(
+        `${BASE_URL}/calendar/earnings?from=${from}&to=${to}&symbol=${symbol}&token=${API_KEY}`
+      );
+      if(!res.ok) throw new Error(res.status);
+      const json = await res.json();
+      const data = json.earningsCalendar || [];
+      cache[symbol] = { ts: Date.now(), data };
+      saveCache();
+      return data;
+    } catch(e){
+      console.warn(`fetchEarnings(${symbol}):`, e);
+      return null;
+    }
+  }
+
+  function getNextEarnings(symbol){
+    const hit = cache[symbol];
+    if(!hit || !hit.data) return null;
+    const today = new Date(); today.setHours(0,0,0,0);
+    return hit.data
+      .filter(e => new Date(e.date) >= today)
+      .sort((a,b) => new Date(a.date)-new Date(b.date))[0] || null;
+  }
+
+  /* ═══════════════════════════════════════════════
+     WATCHLIST ACTIONS
+  ═══════════════════════════════════════════════ */
+  async function addTicker(){
+    const inp = document.getElementById('tickerInput');
+    const sym = inp.value.trim().toUpperCase().replace(/[^A-Z.]/g,'');
+    if(!sym){ inp.focus(); return; }
+    if(watchlist.includes(sym)){ toast(`${sym} は既に追加済みです`,'error'); inp.value=''; return; }
+    watchlist.push(sym);
+    saveWatchlist();
+    inp.value = '';
+    renderWatchlist();
+    renderCalendar();
+    toast(`${sym} を追加しました。データ取得中…`,'info');
+    loadingSet.add(sym);
+    await fetchEarnings(sym);
+    loadingSet.delete(sym);
+    renderWatchlist();
+    renderCalendar();
+    updateStats();
+    checkNotifications();
+  }
+
+  function removeTicker(sym){
+    watchlist = watchlist.filter(s => s !== sym);
+    saveWatchlist();
+    renderWatchlist();
+    renderCalendar();
+    updateStats();
+    toast(`${sym} を削除しました`,'info');
+  }
+
+  async function refreshAll(){
+    const btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    cache = {};
+    localStorage.removeItem('ec_cache');
+    watchlist.forEach(s => loadingSet.add(s));
+    renderWatchlist();
+    await Promise.all(watchlist.map(s => fetchEarnings(s,true)));
+    watchlist.forEach(s => loadingSet.delete(s));
+    btn.classList.remove('spinning');
+    renderWatchlist();
+    renderCalendar();
+    updateStats();
+    checkNotifications();
+    toast('決算データを更新しました','success');
+  }
+
+  /* ═══════════════════════════════════════════════
+     RENDER WATCHLIST
+  ═══════════════════════════════════════════════ */
+  function renderWatchlist(){
+    const el = document.getElementById('watchlist');
+    if(!watchlist.length){
+      el.innerHTML=`<div class="empty"><div class="empty-icon">📋</div>ティッカーを追加してください</div>`;
+      return;
+    }
+    el.innerHTML = watchlist.map(sym => {
+      const loading = loadingSet.has(sym);
+      const next    = getNextEarnings(sym);
+      const noCache = !cache[sym];
+
+      let badge = '';
+      let dateInfo = '';
+
+      if(loading || noCache){
+        badge    = `<span class="badge badge-grey"><span class="spin-sm"></span></span>`;
+        dateInfo = '取得中…';
+      } else if(next){
+        const d = daysUntil(next.date);
+        if(d <= 3 && d >= 0)  badge = `<span class="badge badge-red">あと${d}日</span>`;
+        else if(d > 0)        badge = `<span class="badge badge-cyan">あと${d}日</span>`;
+        dateInfo = `次の決算: ${fmtJP(next.date)}`;
+      } else {
+        dateInfo = 'データなし';
+      }
+
+      return `
+        <div class="ticker-card ${next?'has-next':''}" onclick="openDetail('${sym}')">
+          <div class="tc-info">
+            <div class="tc-symbol">${sym}</div>
+            <div class="tc-date">${dateInfo}</div>
+          </div>
+          <div class="tc-actions">
+            ${badge}
+            <button class="cal-jump-btn" onclick="event.stopPropagation();jumpTo('${sym}')" title="カレンダーで確認">📅</button>
+            <button class="del-btn" onclick="event.stopPropagation();removeTicker('${sym}')" title="削除">✕</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ═══════════════════════════════════════════════
+     RENDER CALENDAR
+  ═══════════════════════════════════════════════ */
+  function renderCalendar(){
+    document.getElementById('calTitle').textContent = `${calYear}年 ${MONTHS_JP[calMonth]}`;
+
+    // Build earnings map for visible months (prev + current + next)
+    const emap = {};
+    for(const sym of watchlist){
+      const hit = cache[sym];
+      if(!hit || !hit.data) continue;
+      for(const e of hit.data){
+        const d = new Date(e.date);
+        if(d.getFullYear() === calYear && d.getMonth() === calMonth){
+          if(!emap[e.date]) emap[e.date] = [];
+          emap[e.date].push(e);
+        }
+      }
+    }
+
+    const todayStr = fmtDate(new Date());
+    const firstWday = new Date(calYear, calMonth, 1).getDay();
+    const daysInMo  = new Date(calYear, calMonth+1, 0).getDate();
+    const daysInPrev= new Date(calYear, calMonth,   0).getDate();
+    const totalCells= Math.ceil((firstWday + daysInMo) / 7) * 7;
+
+    let html = '';
+    for(let i = 0; i < totalCells; i++){
+      let dayN, dateStr, other=false;
+      if(i < firstWday){
+        dayN = daysInPrev - firstWday + i + 1;
+        const pm = calMonth===0?11:calMonth-1, py=calMonth===0?calYear-1:calYear;
+        dateStr = `${py}-${String(pm+1).padStart(2,'0')}-${String(dayN).padStart(2,'0')}`;
+        other = true;
+      } else if(i >= firstWday + daysInMo){
+        dayN = i - firstWday - daysInMo + 1;
+        const nm = calMonth===11?0:calMonth+1, ny=calMonth===11?calYear+1:calYear;
+        dateStr = `${ny}-${String(nm+1).padStart(2,'0')}-${String(dayN).padStart(2,'0')}`;
+        other = true;
+      } else {
+        dayN = i - firstWday + 1;
+        dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(dayN).padStart(2,'0')}`;
+      }
+
+      const isToday   = dateStr === todayStr;
+      const dayOfWeek = i % 7;
+      const isWeekend = (dayOfWeek===0||dayOfWeek===6);
+      const earnings  = emap[dateStr] || [];
+
+      const MAX_SHOW = 3;
+      const tagHtml  = earnings.slice(0, MAX_SHOW).map(e => {
+        const cls  = e.hour==='bmo'?'bmo':e.hour==='amc'?'amc':'def';
+        const icon = e.hour==='bmo'?'▲':e.hour==='amc'?'▼':'◆';
+        return `<div class="e-tag ${cls}" onclick="event.stopPropagation();showDetail('${e.symbol}','${e.date}','${e.hour||''}','${e.epsEstimate||''}')" title="${e.symbol}">${icon} ${e.symbol}</div>`;
+      }).join('');
+      const more = earnings.length > MAX_SHOW ? `<div class="e-more">+${earnings.length-MAX_SHOW}件</div>` : '';
+
+      html += `
+        <div class="cal-day ${other?'other-month':''} ${isToday?'today':''} ${isWeekend?'weekend':''}">
+          <div class="day-num">${dayN}</div>
+          ${tagHtml}${more}
+        </div>`;
+    }
+    document.getElementById('calDays').innerHTML = html;
+  }
+
+  /* ═══════════════════════════════════════════════
+     STATS
+  ═══════════════════════════════════════════════ */
+  function updateStats(){
+    let thisMonth=0, next7=0;
+    const today = new Date(); today.setHours(0,0,0,0);
+    for(const sym of watchlist){
+      const hit = cache[sym];
+      if(!hit || !hit.data) continue;
+      for(const e of hit.data){
+        const d = new Date(e.date); d.setHours(0,0,0,0);
+        if(d.getFullYear()===calYear && d.getMonth()===calMonth) thisMonth++;
+        const diff = Math.round((d-today)/86400000);
+        if(diff>=0 && diff<=7) next7++;
+      }
+    }
+    document.getElementById('stats').innerHTML = `
+      <div class="stat" style="--stat-color:var(--cyan)">
+        <div class="stat-lbl">ウォッチ銘柄</div>
+        <div class="stat-val">${watchlist.length}</div>
+      </div>
+      <div class="stat" style="--stat-color:var(--purple)">
+        <div class="stat-lbl">今月の決算</div>
+        <div class="stat-val">${thisMonth}</div>
+      </div>
+      <div class="stat" style="--stat-color:${next7>0?'var(--red)':'var(--green)'}">
+        <div class="stat-lbl">7日以内</div>
+        <div class="stat-val">${next7}</div>
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     CALENDAR NAVIGATION
+  ═══════════════════════════════════════════════ */
+  function changeMonth(d){
+    calMonth += d;
+    if(calMonth>11){calMonth=0;calYear++}
+    else if(calMonth<0){calMonth=11;calYear--}
+    renderCalendar();
+    updateStats();
+  }
+  function goToday(){
+    calYear=new Date().getFullYear();
+    calMonth=new Date().getMonth();
+    renderCalendar();
+    updateStats();
+  }
+  function jumpTo(sym){
+    const next=getNextEarnings(sym);
+    if(!next){toast(`${sym} の決算日データがありません`,'error');return}
+    const d=new Date(next.date);
+    calYear=d.getFullYear();calMonth=d.getMonth();
+    renderCalendar();
+    updateStats();
+  }
+
+  /* ═══════════════════════════════════════════════
+     DETAIL MODAL
+  ═══════════════════════════════════════════════ */
+  function showDetail(sym, date, hour, epsEst){
+    const d     = daysUntil(date);
+    const hourJP= hour==='bmo'?'寄り前発表 (BMO)':hour==='amc'?'引け後発表 (AMC)':'未定';
+    const daysJP= d>0?`あと ${d} 日`:(d===0?'本日':` ${Math.abs(d)} 日前`);
+    document.getElementById('modalTitle').textContent = `📊 ${sym}`;
+    document.getElementById('modalBody').innerHTML = `
+      <div class="modal-row"><span class="modal-key">決算日</span><span class="modal-val">${fmtJP(date)}</span></div>
+      <div class="modal-row"><span class="modal-key">残日数</span><span class="modal-val" style="color:${d<=3&&d>=0?'var(--red)':'var(--cyan)'}">${daysJP}</span></div>
+      <div class="modal-row"><span class="modal-key">発表時間</span><span class="modal-val">${hourJP}</span></div>
+      ${epsEst?`<div class="modal-row"><span class="modal-key">EPS 予想</span><span class="modal-val">$${parseFloat(epsEst).toFixed(2)}</span></div>`:''}
+    `;
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+  function closeModal(e){
+    if(!e || e.target===document.getElementById('modalOverlay'))
+      document.getElementById('modalOverlay').classList.remove('open');
+  }
+  document.addEventListener('keydown', e => { if(e.key==='Escape'){ closeModal(); closePanel(); } });
+
+  /* ═══════════════════════════════════════════════
+     NOTIFICATIONS
+  ═══════════════════════════════════════════════ */
+  async function enableNotif(){
+    if(!('Notification' in window)){ toast('このブラウザは通知非対応です','error'); return }
+    const p = await Notification.requestPermission();
+    updateNotifUI(p);
+    if(p==='granted'){ toast('通知を有効化しました','success'); checkNotifications() }
+    else { toast('通知が許可されませんでした','error') }
+  }
+  function updateNotifUI(p){
+    const badge=document.getElementById('notifBadge');
+    const icon =document.getElementById('notifIcon');
+    const txt  =document.getElementById('notifText');
+    if(p==='granted'){badge.className='notif-badge granted';icon.textContent='🔔';txt.textContent='通知: 有効'}
+    else if(p==='denied'){badge.className='notif-badge denied';icon.textContent='🔕';txt.textContent='通知: 拒否'}
+    else{badge.className='notif-badge default';icon.textContent='🔔';txt.textContent='通知: 未設定'}
+  }
+  function checkNotifications(){
+    if(Notification.permission!=='granted') return;
+    const today=new Date();today.setHours(0,0,0,0);
+    for(const sym of watchlist){
+      const next=getNextEarnings(sym);
+      if(!next) continue;
+      const d=daysUntil(next.date);
+      const triggers=[
+        {d:3, key:`${sym}|${next.date}|3d`, title:`📊 ${sym} 決算3日前`, body:`${sym}の決算は${fmtJP(next.date)}（3日後）です`},
+        {d:1, key:`${sym}|${next.date}|1d`, title:`🚨 ${sym} 決算前日`,  body:`${sym}の決算は明日 ${fmtJP(next.date)} です！`},
+        {d:0, key:`${sym}|${next.date}|0d`, title:`🎯 ${sym} 決算日！`,  body:`今日は${sym}の決算発表日です`},
+      ];
+      for(const t of triggers){
+        if(d===t.d && !notifSent[t.key]){
+          try{
+            new Notification(t.title,{body:t.body,icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📊</text></svg>'});
+            notifSent[t.key]=Date.now();
+            saveNotifSent();
+          }catch(e){}
+        }
+      }
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     TOAST
+  ═══════════════════════════════════════════════ */
+  function toast(msg, type='info'){
+    const wrap=document.getElementById('toastWrap');
+    const el=document.createElement('div');
+    el.className=`toast ${type}`;
+    el.textContent=msg;
+    wrap.appendChild(el);
+    setTimeout(()=>{
+      el.style.transition='all .3s';
+      el.style.opacity='0';
+      el.style.transform='translateX(16px)';
+      setTimeout(()=>el.remove(),300);
+    },3000);
+  }
+
+  /* ═══════════════════════════════════════════════
+     DETAIL PANEL – STOCK INFO
+  ═══════════════════════════════════════════════ */
+  const pCache   = {};
+  const PANEL_TTL = 15 * 60 * 1000; // 15 min
+
+  let currentSym = null;
+  let currentTab = 'overview';
+  let acTimer    = null;
+
+  async function openDetail(sym){
+    currentSym = sym;
+    currentTab = 'overview';
+    document.querySelectorAll('.ptab').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === 'overview')
+    );
+    document.getElementById('panelSym').textContent = sym;
+    document.getElementById('panelCo').textContent  = '';
+    document.getElementById('panelBody').innerHTML  = priceSkelHTML();
+    document.getElementById('panelOverlay').classList.add('open');
+
+    /* ── キャッシュヒット ── */
+    const hit = pCache[sym];
+    if(hit && (Date.now() - hit.ts) < PANEL_TTL){
+      document.getElementById('panelCo').textContent = hit.profile?.name || '';
+      document.getElementById('panelBody').innerHTML =
+        buildPriceCard(hit.quote) + safeChartCard(hit.fin);
+      return;
+    }
+
+    /* ── Step 1: 価格だけ先に取得して即表示（軽い） ── */
+    const [quote, profile] = await Promise.all([
+      safeFetch(`/quote?symbol=${sym}`),
+      safeFetch(`/stock/profile2?symbol=${sym}`),
+    ]);
+    document.getElementById('panelCo').textContent = profile?.name || '';
+    document.getElementById('panelBody').innerHTML =
+      buildPriceCard(quote) + chartSkelHTML();
+
+    /* ── Step 2: EPS データを非同期・タイムアウト付きで取得 ── */
+    const fin = await safeFetch(`/stock/earnings?symbol=${sym}`, 5000);
+
+    /* チャート領域だけ差し替え */
+    const el = document.getElementById('chartArea');
+    if(el) el.outerHTML = safeChartCard(fin);
+
+    pCache[sym] = { ts: Date.now(), quote, fin, profile };
+  }
+
+  function closePanel(){
+    document.getElementById('panelOverlay').classList.remove('open');
+  }
+  function panelBgClick(e){
+    if(e.target === document.getElementById('panelOverlay')) closePanel();
+  }
+
+  /* タイムアウト付き fetch（必ず null を返す、絶対に throw しない） */
+  async function safeFetch(path, timeoutMs = 10000){
+    const ctrl = new AbortController();
+    const tid  = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const r = await fetch(`${BASE_URL}${path}&token=${API_KEY}`,
+                            { signal: ctrl.signal });
+      clearTimeout(tid);
+      if(!r.ok) return null;
+      return await r.json();
+    } catch {
+      clearTimeout(tid);
+      return null;
+    }
+  }
+
+  /* エラーを吸収してチャートカード HTML を返す */
+  function safeChartCard(fin){
+    try { return buildChartCard(fin); }
+    catch(e){ return `<div class="chart-card"><div class="no-panel-data">チャート描画エラー</div></div>`; }
+  }
+
+  function priceSkelHTML(){
+    return `
+      <div class="price-card">
+        <div class="skel" style="height:46px;width:170px;margin-bottom:12px"></div>
+        <div class="skel" style="height:14px;width:120px;margin-bottom:16px"></div>
+        <div class="price-grid">
+          ${Array(4).fill('<div class="skel" style="height:13px;margin:5px 0;width:88%"></div>').join('')}
+        </div>
+      </div>` + chartSkelHTML();
+  }
+  function chartSkelHTML(){
+    return `<div class="chart-card" id="chartArea">
+      <div class="chart-head">EPS 実績 vs 予想（直近4四半期）</div>
+      <div class="skel" style="height:10px;width:180px;margin:10px 0"></div>
+      <div class="skel" style="height:190px"></div>
+    </div>`;
+  }
+
+  /* ── PRICE CARD ── */
+  function buildPriceCard(q){
+    if(!q || !q.c)
+      return `<div class="price-card"><div class="no-panel-data">価格データを取得できませんでした</div></div>`;
+    const {c,d,dp,h,l,o,pc} = q;
+    const up = d >= 0;
+    const sgn = up ? '+' : '';
+    const arr = up ? '▲' : '▼';
+    const fmt = v => v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    return `
+      <div class="price-card">
+        <div class="price-top">
+          <div class="price-num">$${fmt(c)}</div>
+          <div class="price-chg ${up?'up':'dn'}">${arr} ${sgn}${d.toFixed(2)} (${sgn}${dp.toFixed(2)}%)</div>
+        </div>
+        <div class="price-grid">
+          <div class="pg-row"><span class="pg-lbl">始値</span><span class="pg-val">$${fmt(o)}</span></div>
+          <div class="pg-row"><span class="pg-lbl">高値</span><span class="pg-val" style="color:var(--green)">$${fmt(h)}</span></div>
+          <div class="pg-row"><span class="pg-lbl">前日終値</span><span class="pg-val">$${fmt(pc)}</span></div>
+          <div class="pg-row"><span class="pg-lbl">安値</span><span class="pg-val" style="color:var(--red)">$${fmt(l)}</span></div>
+        </div>
+      </div>`;
+  }
+
+  /* ── EPS CHART CARD ── */
+  function buildChartCard(eps){
+    if(!eps || !Array.isArray(eps) || !eps.length)
+      return `<div class="chart-card"><div class="no-panel-data">EPSデータを取得できませんでした</div></div>`;
+
+    // actual or estimate のある直近4件を古い順（左→右）で表示
+    const rows = eps
+      .filter(d => d.actual != null || d.estimate != null)
+      .slice(0, 4)
+      .reverse()
+      .map(d => ({
+        label   : `Q${d.quarter}'${String(d.year).slice(2)}`,
+        actual  : d.actual,
+        estimate: d.estimate,
+        surp    : d.surprisePercent,
+      }));
+
+    if(!rows.length)
+      return `<div class="chart-card"><div class="no-panel-data">EPSデータがありません</div></div>`;
+
+    return `
+      <div class="chart-card">
+        <div class="chart-head">EPS 実績 vs 予想（直近4四半期）</div>
+        <div class="chart-legend">
+          <div class="cl-item"><div class="cl-dot" style="background:var(--cyan)"></div>実績 (Actual)</div>
+          <div class="cl-item"><div class="cl-dot" style="background:#3a3a5c"></div>予想 (Estimate)</div>
+        </div>
+        ${buildEPSChart(rows)}
+        <table class="q-table">
+          <thead><tr>
+            <th>指標</th>
+            ${rows.map(r=>`<th>${r.label}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>実績 EPS</td>
+              ${rows.map(r=>`<td style="color:var(--cyan)">${r.actual!=null?'$'+r.actual.toFixed(2):'—'}</td>`).join('')}
+            </tr>
+            <tr>
+              <td>予想 EPS</td>
+              ${rows.map(r=>`<td style="color:var(--txt2)">${r.estimate!=null?'$'+r.estimate.toFixed(2):'—'}</td>`).join('')}
+            </tr>
+            <tr>
+              <td>サプライズ</td>
+              ${rows.map(r=>{
+                if(r.surp==null) return '<td>—</td>';
+                const pos = r.surp >= 0;
+                return `<td style="color:${pos?'var(--green)':'var(--red)'}">${pos?'+':''}${r.surp.toFixed(1)}%</td>`;
+              }).join('')}
+            </tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  /* ── EPS SVG BAR CHART ── */
+  function buildEPSChart(rows){
+    const W=400, H=200;
+    const PAD={t:20, r:12, b:36, l:52};
+    const cW=W-PAD.l-PAD.r, cH=H-PAD.t-PAD.b;
+
+    const all = rows.flatMap(r=>[r.actual,r.estimate]).filter(v=>v!=null);
+    if(!all.length) return '<div class="no-panel-data">チャートデータなし</div>';
+
+    const maxV = Math.max(...all);
+    const minV = Math.min(0, ...all);
+    const range = maxV - minV || 1;
+
+    const mag  = Math.pow(10, Math.floor(Math.log10(range || 0.1)));
+    const step = [0.05,0.1,0.2,0.25,0.5,1,2,5].map(m=>m*mag).find(s=>range/s<=5) || mag;
+    const nMin = Math.floor(minV/step)*step;
+    const nMax = Math.ceil(maxV/step)*step;
+    const nRange = nMax-nMin || 1;
+
+    const sy = v => PAD.t + cH*(1-(v-nMin)/nRange);
+    const zy = sy(0);
+    const pts = [];
+
+    // Gridlines + Y labels
+    const nSteps = Math.round((nMax-nMin)/step);
+    for(let i=0; i<=nSteps; i++){
+      const v   = nMin + i*step;
+      const y   = sy(v).toFixed(1);
+      const lbl = `$${Math.abs(v)<0.001?'0':v.toFixed(v<1?2:1)}`;
+      pts.push(`<line x1="${PAD.l}" y1="${y}" x2="${W-PAD.r}" y2="${y}" stroke="#2a2a4a" stroke-dasharray="3,3"/>`);
+      pts.push(`<text x="${PAD.l-5}" y="${(sy(v)+4).toFixed(1)}" text-anchor="end" fill="#475569" font-size="9" font-family="system-ui,sans-serif">${lbl}</text>`);
+    }
+    if(nMin < 0)
+      pts.push(`<line x1="${PAD.l}" y1="${zy.toFixed(1)}" x2="${W-PAD.r}" y2="${zy.toFixed(1)}" stroke="#3a3a5c" stroke-width="1.5"/>`);
+
+    const n  = rows.length;
+    const gW = cW / n;
+    const bW = gW * 0.3;
+    const gap = bW * 0.3;
+    const off = (gW - 2*bW - gap) / 2;
+
+    rows.forEach((row, gi) => {
+      const gx = PAD.l + gi*gW;
+
+      // Estimate bar（左・グレー）
+      if(row.estimate != null){
+        const top = row.estimate < 0 ? zy : sy(row.estimate);
+        const bH  = Math.max(Math.abs(sy(row.estimate)-zy), 1);
+        pts.push(`<rect x="${(gx+off).toFixed(1)}" y="${top.toFixed(1)}" width="${bW.toFixed(1)}" height="${bH.toFixed(1)}" fill="#3a3a5c" rx="2" class="bar-rect"><title>予想EPS: $${row.estimate.toFixed(2)}</title></rect>`);
+      }
+      // Actual bar（右・シアン or 赤）
+      if(row.actual != null){
+        const neg   = row.actual < 0;
+        const color = neg ? '#ef4444' : '#00d4ff';
+        const top   = neg ? zy : sy(row.actual);
+        const bH    = Math.max(Math.abs(sy(row.actual)-zy), 1);
+        pts.push(`<rect x="${(gx+off+bW+gap).toFixed(1)}" y="${top.toFixed(1)}" width="${bW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${color}" opacity="0.9" rx="2" class="bar-rect"><title>実績EPS: $${row.actual.toFixed(2)}</title></rect>`);
+      }
+      // サプライズ % をバーの上に表示
+      if(row.surp != null){
+        const pos  = row.surp >= 0;
+        const topY = Math.min(
+          row.actual   != null ? sy(row.actual)   : PAD.t+cH,
+          row.estimate != null ? sy(row.estimate) : PAD.t+cH
+        ) - 4;
+        pts.push(`<text x="${(gx+gW/2).toFixed(1)}" y="${topY.toFixed(1)}" text-anchor="middle" fill="${pos?'#10b981':'#ef4444'}" font-size="8" font-weight="700" font-family="system-ui,sans-serif">${pos?'+':''}${row.surp.toFixed(1)}%</text>`);
+      }
+      // Quarter label
+      pts.push(`<text x="${(gx+gW/2).toFixed(1)}" y="${H-7}" text-anchor="middle" fill="#64748b" font-size="10" font-family="system-ui,sans-serif">${row.label}</text>`);
+    });
+
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible">${pts.join('')}</svg>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     HTML ESCAPE HELPER
+  ═══════════════════════════════════════════════ */
+  function escH(s){
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ═══════════════════════════════════════════════
+     PANEL TAB SWITCHING
+  ═══════════════════════════════════════════════ */
+  function switchTab(tab){
+    currentTab = tab;
+    document.querySelectorAll('.ptab').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab)
+    );
+    const body = document.getElementById('panelBody');
+    if(tab === 'overview'){
+      const hit = pCache[currentSym];
+      if(hit) body.innerHTML = buildPriceCard(hit.quote) + safeChartCard(hit.fin);
+      else    body.innerHTML = priceSkelHTML();
+      return;
+    }
+    body.innerHTML = tabSkelHTML();
+    if(tab === 'news')    loadNewsTab(currentSym);
+    if(tab === 'analyst') loadAnalystTab(currentSym);
+    if(tab === 'peers')   loadPeersTab(currentSym);
+  }
+
+  function tabSkelHTML(){
+    return `<div style="padding:16px">${
+      Array(4).fill('<div class="skel" style="height:60px;margin-bottom:10px;border-radius:10px"></div>').join('')
+    }</div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     NEWS TAB
+  ═══════════════════════════════════════════════ */
+  /* ひらがな or カタカナが含まれれば日本語記事と判定 */
+  function isJP(text){ return /[\u3040-\u30FF]/.test(text||'') }
+
+  async function loadNewsTab(sym){
+    const to   = new Date();
+    const from = new Date(Date.now() - 90*86400000); // 日本語記事を増やすため90日に拡大
+    const fmt  = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const news = await safeFetch(`/company-news?symbol=${sym}&from=${fmt(from)}&to=${fmt(to)}`, 8000);
+    const body = document.getElementById('panelBody');
+    if(!body) return;
+
+    if(!Array.isArray(news) || !news.length){
+      body.innerHTML = renderNews([], false);
+      return;
+    }
+
+    const jpNews = news.filter(n => isJP(n.headline) || isJP(n.summary));
+    if(jpNews.length){
+      body.innerHTML = renderNews(jpNews, true);
+    } else {
+      /* 日本語記事が見つからなければ英語記事を表示（フォールバック） */
+      body.innerHTML = renderNews(news, false);
+    }
+  }
+
+  function renderNews(news, isJpFiltered){
+    if(!Array.isArray(news) || !news.length)
+      return `<div class="no-panel-data" style="margin:24px auto">ニュースが見つかりませんでした</div>`;
+    const badge = isJpFiltered
+      ? `<div class="news-filter-badge">🇯🇵 日本語記事のみ表示</div>`
+      : `<div class="news-filter-badge news-filter-en">🌐 日本語記事なし・英語記事を表示中</div>`;
+    return badge + `<div class="news-list">${news.slice(0,10).map(n => {
+      const dt  = new Date((n.datetime||0)*1000);
+      const dateStr = `${dt.getMonth()+1}/${dt.getDate()}`;
+      return `<a class="news-card" href="${escH(n.url||'#')}" target="_blank" rel="noopener">
+        <div class="news-meta">
+          <span class="news-src">${escH(n.source||'')}</span>
+          <span class="news-date">${dateStr}</span>
+        </div>
+        <div class="news-ttl">${escH(n.headline||'')}</div>
+      </a>`;
+    }).join('')}</div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     ANALYST TAB
+  ═══════════════════════════════════════════════ */
+  async function loadAnalystTab(sym){
+    const [rec, updn] = await Promise.all([
+      safeFetch(`/stock/recommendation?symbol=${sym}`, 8000),
+      safeFetch(`/stock/upgrade-downgrade?symbol=${sym}`, 8000),
+    ]);
+    const body = document.getElementById('panelBody');
+    if(body) body.innerHTML = renderAnalyst(rec, updn);
+  }
+
+  function renderAnalyst(rec, updn){
+    let html = '';
+    /* ── コンセンサスバー ── */
+    if(Array.isArray(rec) && rec.length){
+      const r = rec[0];
+      const total = (r.strongBuy||0)+(r.buy||0)+(r.hold||0)+(r.sell||0)+(r.strongSell||0);
+      const pct = n => total ? Math.round(n/total*100) : 0;
+      const rows = [
+        {lbl:'強い買い', n:r.strongBuy||0,  color:'#10b981'},
+        {lbl:'買い',     n:r.buy||0,        color:'#34d399'},
+        {lbl:'中立',     n:r.hold||0,       color:'#f59e0b'},
+        {lbl:'売り',     n:r.sell||0,       color:'#f87171'},
+        {lbl:'強い売り', n:r.strongSell||0, color:'#ef4444'},
+      ];
+      html += `<div>
+        <div style="font-size:11px;color:var(--txt3);margin-bottom:10px">
+          ${escH(r.period||'')} 時点のコンセンサス（${total}人）
+        </div>
+        <div class="rec-bars">${rows.map(row => `
+          <div class="rec-row">
+            <span class="rec-lbl">${row.lbl}</span>
+            <div class="rec-bwrap"><div class="rec-bar" style="width:${pct(row.n)}%;background:${row.color}"></div></div>
+            <span class="rec-cnt">${row.n}</span>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="no-panel-data">推奨データなし</div>`;
+    }
+    /* ── 格付け変更リスト ── */
+    if(Array.isArray(updn) && updn.length){
+      const items = updn.slice(0,8).map(g => {
+        const act = (g.action||'').toLowerCase();
+        const badgeCls = act.includes('up') ? 'gbadge-up' : act.includes('down') ? 'gbadge-dn' : 'gbadge-neu';
+        const actionJP = act.includes('up') ? 'アップ' : act.includes('down') ? 'ダウン' : '維持';
+        const chg = [g.fromGrade, g.toGrade].filter(Boolean).join(' → ');
+        return `<div class="grade-row">
+          <div>
+            <div class="grade-firm">${escH(g.company||'')}</div>
+            ${chg ? `<div class="grade-chg">${escH(chg)}</div>` : ''}
+            <div class="grade-dt">${escH(g.gradeDate||'')}</div>
+          </div>
+          <span class="gbadge ${badgeCls}">${actionJP}</span>
+        </div>`;
+      }).join('');
+      html += `<div>
+        <div style="font-size:11px;color:var(--txt3);font-weight:700;text-transform:uppercase;
+                    letter-spacing:.5px;margin-bottom:8px">格付け変更</div>
+        ${items}
+      </div>`;
+    }
+    return html || `<div class="no-panel-data">アナリストデータなし</div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     PEERS TAB
+  ═══════════════════════════════════════════════ */
+  async function loadPeersTab(sym){
+    const peers = await safeFetch(`/stock/peers?symbol=${sym}`, 8000);
+    const body  = document.getElementById('panelBody');
+    if(body) body.innerHTML = renderPeers(peers, sym);
+  }
+
+  function renderPeers(peers, self){
+    if(!Array.isArray(peers) || !peers.length)
+      return `<div class="no-panel-data" style="margin:24px auto">関連銘柄が見つかりませんでした</div>`;
+    const others = peers.filter(p => p !== self);
+    if(!others.length)
+      return `<div class="no-panel-data" style="margin:24px auto">関連銘柄なし</div>`;
+    return `<div>
+      <div style="font-size:11px;color:var(--txt3);margin-bottom:12px">クリックしてウォッチリストに追加</div>
+      <div class="peers-grid">${others.map(p => {
+        const inList = watchlist.includes(p);
+        return `<div class="peer-chip ${inList?'peer-in':''}" onclick="addPeerTicker('${escH(p)}')">
+          ${escH(p)} ${inList?'✓':'+'}
+        </div>`;
+      }).join('')}
+      </div>
+    </div>`;
+  }
+
+  function addPeerTicker(sym){
+    if(watchlist.includes(sym)){ toast(`${sym} は既に追加済みです`,'error'); return; }
+    watchlist.push(sym);
+    saveWatchlist();
+    loadingSet.add(sym);
+    renderWatchlist(); renderCalendar();
+    toast(`${sym} を追加しました。データ取得中…`,'info');
+    fetchEarnings(sym).then(() => {
+      loadingSet.delete(sym);
+      renderWatchlist(); renderCalendar(); updateStats(); checkNotifications();
+    });
+    if(currentTab === 'peers') loadPeersTab(currentSym);
+  }
+
+  /* ═══════════════════════════════════════════════
+     AUTOCOMPLETE
+  ═══════════════════════════════════════════════ */
+  async function runSearch(q){
+    if(!q){ hideAC(); return; }
+    const data = await safeFetch(`/search?q=${encodeURIComponent(q)}`, 5000);
+    const drop = document.getElementById('acDrop');
+    if(!drop) return;
+    if(!data || !data.result || !data.result.length){ hideAC(); return; }
+    const hits = data.result.filter(r => r.type==='Common Stock').slice(0,5);
+    if(!hits.length){ hideAC(); return; }
+    drop.innerHTML = hits.map(r =>
+      `<div class="ac-item" onmousedown="selectAC('${escH(r.symbol)}')">
+        <span class="ac-sym">${escH(r.symbol)}</span>
+        <span class="ac-name">${escH(r.description||'')}</span>
+      </div>`
+    ).join('');
+    drop.style.display = 'block';
+  }
+
+  function selectAC(sym){
+    const inp = document.getElementById('tickerInput');
+    inp.value = sym;
+    hideAC();
+    inp.focus();
+  }
+
+  function hideAC(){
+    const drop = document.getElementById('acDrop');
+    if(!drop) return;
+    drop.style.display = 'none';
+    drop.innerHTML = '';
+  }
+
+  /* ═══════════════════════════════════════════════
+     BULK IMPORT
+  ═══════════════════════════════════════════════ */
+  function openBulkModal(){
+    document.getElementById('bulkInput').value = '';
+    document.getElementById('bulkModal').classList.add('open');
+  }
+
+  function closeBulkModal(e){
+    if(!e || e.target === document.getElementById('bulkModal'))
+      document.getElementById('bulkModal').classList.remove('open');
+  }
+
+  async function doBulkImport(){
+    const raw  = document.getElementById('bulkInput').value;
+    const syms = raw.split(/[\s,\n]+/)
+      .map(s => s.trim().toUpperCase().replace(/[^A-Z.]/g,''))
+      .filter(s => s.length > 0 && s.length <= 10);
+    const newSyms = [...new Set(syms)].filter(s => !watchlist.includes(s));
+    if(!newSyms.length){ toast('追加できる新しいティッカーがありません','error'); return; }
+    closeBulkModal();
+    newSyms.forEach(sym => { watchlist.push(sym); loadingSet.add(sym); });
+    saveWatchlist(); renderWatchlist(); renderCalendar();
+    toast(`${newSyms.length}件を追加しました。データ取得中…`,'info');
+    for(let i=0; i<newSyms.length; i++){
+      if(i>0) await new Promise(r=>setTimeout(r,300));
+      await fetchEarnings(newSyms[i]);
+      loadingSet.delete(newSyms[i]);
+      renderWatchlist(); renderCalendar(); updateStats();
+    }
+    checkNotifications();
+    toast('取得完了','success');
+  }
+
+  /* ═══════════════════════════════════════════════
+     KEYBOARD
+  ═══════════════════════════════════════════════ */
+  document.getElementById('tickerInput').addEventListener('keydown', e => {
+    if(e.key==='Enter'){ hideAC(); addTicker(); }
+    if(e.key==='Escape') hideAC();
+  });
+  document.getElementById('tickerInput').addEventListener('input', e => {
+    const q = e.target.value.trim();
+    clearTimeout(acTimer);
+    if(q.length < 1){ hideAC(); return; }
+    acTimer = setTimeout(() => runSearch(q), 350);
+  });
+  document.getElementById('tickerInput').addEventListener('blur', () => {
+    setTimeout(hideAC, 200);
+  });
+
+  /* ═══════════════════════════════════════════════
+     INIT
+  ═══════════════════════════════════════════════ */
+  async function init(){
+    // Default tickers on first visit
+    if(!watchlist.length){
+      watchlist=[...DEFAULT_TICKERS];
+      saveWatchlist();
+    }
+
+    updateNotifUI(Notification.permission);
+    renderWatchlist();
+    renderCalendar();
+    updateStats();
+
+    // Fetch all (with small stagger to avoid rate limiting)
+    const missing  = watchlist.filter(s => !cache[s]);
+    const cached   = watchlist.filter(s =>  cache[s]);
+
+    // Render cached immediately, then fetch missing with stagger
+    await Promise.all(cached.map(s => fetchEarnings(s)));
+    renderWatchlist(); renderCalendar(); updateStats();
+
+    for(let i=0; i<missing.length; i++){
+      const sym = missing[i];
+      if(i>0) await new Promise(r=>setTimeout(r,300)); // 300ms stagger
+      await fetchEarnings(sym);
+      loadingSet.delete(sym);
+      renderWatchlist(); renderCalendar(); updateStats();
+    }
+
+    checkNotifications();
+  }
+
+  init();
+</script>
+</body>
+</html>
